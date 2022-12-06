@@ -8,11 +8,14 @@ using System.IO;
 using ElevatorSim.Common;
 using Newtonsoft;
 using Newtonsoft.Json;
+using System.Security.Cryptography;
+using System.ComponentModel;
 
 namespace ElevatorSim.Service
 {
     class Program
     {
+        #region Listener and responder
         static void Main(string[] args)
         {
             
@@ -70,6 +73,13 @@ namespace ElevatorSim.Service
                 Console.WriteLine(request.UserHostAddress);
                 Console.WriteLine(request.RawUrl);
                 string response = string.Empty;
+                ServerRespone rsp = new ServerRespone();
+
+                if (request.RawUrl.ToLower().Contains("getbuildingview"))
+                {
+                    rsp = worker.GetBuildingView();
+                    return rsp;
+                }
                 if (request.ContentLength64 > 0)
                 {
                     var body = request.InputStream;
@@ -80,13 +90,14 @@ namespace ElevatorSim.Service
                     Console.WriteLine("Client data content length {0}", request.ContentLength64);
                     Console.WriteLine("Start of data:");
                     response = reader.ReadToEnd();
-                    ServerRespone rsp = new ServerRespone();
+                    
                     if (request.RawUrl.ToLower().Contains("addbuilding")|| request.RawUrl.ToLower().Contains("callelevator"))
                     {
                         Building tmp = JsonConvert.DeserializeObject<Building>(response);
                         rsp = worker.UpdateBuilding(tmp);
                     }
-                    Console.WriteLine(rsp);
+
+                    Console.WriteLine(rsp.Data);
                     return rsp;
                 }
                 else
@@ -99,5 +110,8 @@ namespace ElevatorSim.Service
                 return new ServerRespone() { Success = false, ErrorMessage = ex.Message };
             }
         }
+        #endregion
+
+
     }
 }

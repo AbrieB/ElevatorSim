@@ -14,9 +14,9 @@ namespace ElevatorSim
 {
     public class ElevatorWorker
     {
-        public Building ThisBuilding { get; private set; }
-        
+        public Building ThisBuilding { get; private set; }        
         private Process server;
+        private Process output;
         
         #region AddBuilding
         public void AddBuilding(int PeopleElevators, int FreightElevaors, int Floors, int MaxpassangersPerElevator = 10)
@@ -62,7 +62,6 @@ namespace ElevatorSim
             }
             return retVal;
         }
-
         
         private void ValidateBuilding(int PeopleElevators, int Floors)
         {
@@ -83,6 +82,7 @@ namespace ElevatorSim
         }
         #endregion
 
+        #region Call elevator
         public void CallElevator(int FloorNumber, List<Passenger> Passangers)
         {
             if (Passangers.Count()<1)
@@ -106,10 +106,27 @@ namespace ElevatorSim
 
         public void CallElevator(int FloorNumber, int Destination)
         {
+            if (FloorNumber < 1 || FloorNumber > ThisBuilding.Floors.Count())
+            {
+                throw new Exception("Not a valid floor");
+            }
+
+            if (Destination < 1 || Destination > ThisBuilding.Floors.Count())
+            {
+                throw new Exception("Not a valid floor");
+            }
+
+            if (FloorNumber == Destination)
+            {
+                return;
+            }
+
             ThisBuilding.Floors.First(x => x.FloorNumber == FloorNumber).PassengersWaiting.Add( new Passenger(Destination));
             CallServer("http://localhost:8001/CallElevator,ThisBuilding", ThisBuilding);
         }
+        #endregion
 
+        #region Stop and start sim
         public void StartSim()
         {
             if (this.ThisBuilding== null)
@@ -122,8 +139,10 @@ namespace ElevatorSim
         public void StopSim()
         {
             ThisBuilding = null;
-            server.Close();
+            server.Kill();
+            output.Kill();
         }
+        #endregion
 
         public List<Passenger> AddPassenger(List<int> DestinationFloor)
         {
@@ -141,6 +160,7 @@ namespace ElevatorSim
             return retVal;
         }
 
+        #region Open windows
         public void OpenServerWindow()
         {
             if (server == null)
@@ -148,11 +168,25 @@ namespace ElevatorSim
                 ProcessStartInfo psi = new ProcessStartInfo("ElevatorSim.Service.exe")
                 {
                     CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Normal
+                    WindowStyle = ProcessWindowStyle.Minimized
                 };
                 server = Process.Start(psi);
             }
         }
+
+        public void OpenOutputWindow()
+        {
+            if (output == null)
+            {
+                ProcessStartInfo psi = new ProcessStartInfo("ElevatorSim.Output.exe")
+                {
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Normal
+                };
+                output = Process.Start(psi);
+            }
+        }
+        #endregion
 
         private string CallServer(string url, Building building)
         {
@@ -177,15 +211,10 @@ namespace ElevatorSim
             string result = string.Empty;
             result = responseStream.ReadToEnd();
             var json = JsonSerializer.Deserialize<ServerRespone>(result);
-            if (json.Success)
-            {
-                Console.Write(json.Data);
-            }
-            else
+            if (!json.Success)
             {
                 Console.Write(json.ErrorMessage);
-            }
-            
+            }            
             webresponse.Close();
             return result;
         }
