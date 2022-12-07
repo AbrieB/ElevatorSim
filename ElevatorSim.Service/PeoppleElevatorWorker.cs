@@ -10,11 +10,11 @@ using Newtonsoft.Json;
 
 namespace ElevatorSim.Service
 {
-    public class ServerWorker
+    public class PeoppleElevatorWorker
     {
         private Building ThisBuilding { get; set; }
         BackgroundWorker elevatorWorker = new BackgroundWorker();
-        public ServerWorker()
+        public PeoppleElevatorWorker()
         {
             elevatorWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.elevatorWorker_DoWork);
         }
@@ -81,7 +81,7 @@ namespace ElevatorSim.Service
                 //     -check if elevator with passanger is moving and set status
                 //     -chech if current floor has dropoffs
                 //     -check if current floor has pick ups
-                //Move elevators (sleep ThisBuilding.SecondsBetweenFloors 
+                //Move elevators  
                 foreach (Floor floor in ThisBuilding.Floors)
                 {
                     AssignElevator(floor);
@@ -182,14 +182,15 @@ namespace ElevatorSim.Service
             selection.AddRange(ThisBuilding.PeopleElevators.Where(x => ((x.Status == Enums.ElevatorStatus.MovingUp && x.CurrentFloor < floorNumber)
                                                                             || x.Status == Enums.ElevatorStatus.Stationary)
                                                                             && x.Passangers.Count() < ThisBuilding.MaxPassengers).ToList());
+            selection = selection.Distinct().OrderBy(item => Math.Abs(item.CurrentFloor - floorNumber)).ToList();
             return selection.OrderBy(item => Math.Abs(item.CurrentFloor - floorNumber)).First();
         }
 
         private void MoveElevators()
         {
+            Thread.Sleep(1000);
             for (int i = 0; i < ThisBuilding.PeopleElevators.Count(); i++)
-            {
-                Thread.Sleep(1000);
+            {                
                 PeopleElevator elevator = ThisBuilding.PeopleElevators[i];
                 
                 switch (elevator.Status)
@@ -263,7 +264,7 @@ namespace ElevatorSim.Service
             //If all elevators are stationary
             if (ThisBuilding.PeopleElevators.Count(x => x.Status == Enums.ElevatorStatus.Stationary) == ThisBuilding.PeopleElevators.Count)
             {
-                GetClosestElevator(floor.FloorNumber);
+                PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
                 AssignElevator(ThisBuilding.PeopleElevators.First(), floor.FloorNumber);
             }
 
@@ -276,11 +277,11 @@ namespace ElevatorSim.Service
             {
                 if (goingDown.Count>0)
                 {
-                if (passengersGoinDown.Min(x=> x.DestinationFloor)< goingDown.Min(x=> x.Destination) )
-                {
-                    PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
-                    AssignElevator(elevator,floor.FloorNumber);
-                }
+                    if (passengersGoinDown.Min(x=> x.DestinationFloor)< goingDown.Min(x=> x.Destination) )
+                    {
+                        PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
+                        AssignElevator(elevator,floor.FloorNumber);
+                    }
                 }
 
             }

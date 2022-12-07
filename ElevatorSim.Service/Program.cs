@@ -29,7 +29,7 @@ namespace ElevatorSim.Service
 
                     Console.WriteLine("Listening on port 8001...");
                     bool running = true;
-                    ServerWorker worker = new ServerWorker();
+                    PeoppleElevatorWorker worker = new PeoppleElevatorWorker();
                     while (running)
                     {
                         HttpListenerContext ctx = listener.GetContext();
@@ -66,7 +66,7 @@ namespace ElevatorSim.Service
             }
         }
 
-        private static ServerRespone ProcessRequest(HttpListenerRequest request,ServerWorker worker)
+        private static ServerRespone ProcessRequest(HttpListenerRequest request,PeoppleElevatorWorker worker)
         {
             try
             {
