@@ -16,7 +16,7 @@ namespace ElevatorSim.Output
         
         static void Main(string[] args)
         {
-            Timer _timer = new Timer(TimerCallback, null, 0, 3000);
+            Timer _timer = new Timer(TimerCallback, null, 0, 1000);
             Console.ReadLine();
         }
 

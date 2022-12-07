@@ -47,5 +47,6 @@ namespace ElevatorSim
             }
             worker.StopSim();
         }
+
     }
 }

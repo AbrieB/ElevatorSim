@@ -84,8 +84,12 @@ namespace ElevatorSim.Service
                 //Move elevators  
                 foreach (Floor floor in ThisBuilding.Floors)
                 {
-                    AssignElevator(floor);
+                    if (floor.PassengersWaiting.Count>0)
+                    {
+                        AssignElevator(floor);
+                    }                    
                 }
+
                 foreach (PeopleElevator elevator in ThisBuilding.PeopleElevators)
                 {
                     if (elevator.Passangers.Count>0 && elevator.Status == Enums.ElevatorStatus.Stationary)
@@ -106,7 +110,7 @@ namespace ElevatorSim.Service
                         DropOffPeople(elevator.CurrentFloor, elevator);
                         PickUpPeople(elevator.CurrentFloor, elevator);
                     }
-                    UpdateElevatorDestination(elevator);
+                    //UpdateElevatorDestination(elevator);
                 }
 
                 MoveElevators();
@@ -124,33 +128,30 @@ namespace ElevatorSim.Service
                     int capacity = ThisBuilding.MaxPassengers - elevator.Passangers.Count();
                     List<Passenger> passengers = goingUp.Take(capacity).ToList();
                     elevator.Passangers.AddRange(passengers);
-                    foreach (Passenger passenger in passengers)
-                    {
-                        floor.PassengersWaiting.Remove(passenger);
-                    }                    
+                    passengers.ForEach(x => floor.PassengersWaiting.Remove(x));                  
                 }
             }
             if (elevator.Status == Enums.ElevatorStatus.MovingDown)
             {
-                List<Passenger> goingDown = floor.PassengersWaiting.Where(x => x.DestinationFloor > floor.FloorNumber).ToList();
+                List<Passenger> goingDown = floor.PassengersWaiting.Where(x => x.DestinationFloor < floor.FloorNumber).ToList();
                 if (goingDown.Count > 0)
                 {
                     int capacity = ThisBuilding.MaxPassengers - elevator.Passangers.Count();
-                    elevator.Passangers.AddRange(goingDown.Take(capacity));
+                    List<Passenger> passengers = goingDown.Take(capacity).ToList();
+                    elevator.Passangers.AddRange(passengers);
+                    passengers.ForEach(x => floor.PassengersWaiting.Remove(x));
                 }
             }
+
         }
 
         private void DropOffPeople(int floorNumber, PeopleElevator elevator)
         {
             Floor floor = ThisBuilding.Floors.FirstOrDefault(x => x.FloorNumber == floorNumber);
-            List<Passenger> selection = elevator.Passangers.Where(x => x.DestinationFloor == floor.FloorNumber).ToList();
-            if (selection.Count>0)
+            List<Passenger> dropOffs = elevator.Passangers.Where(x => x.DestinationFloor == floorNumber).ToList();
+            if (dropOffs.Count>0)
             {
-                foreach (Passenger passanger in selection)
-                {
-                    elevator.Passangers.Remove(passanger);
-                }
+                dropOffs.ForEach(x => elevator.Passangers.Remove(x));
                 if (elevator.Passangers.Count==0 && elevator.Destination == floor.FloorNumber)
                 {
                     elevator.Status = Enums.ElevatorStatus.Stationary;
@@ -164,31 +165,52 @@ namespace ElevatorSim.Service
             if (elevator.CurrentFloor<floorNumber)
             {
                 elevator.Status = Enums.ElevatorStatus.MovingUp;
-                elevator.Destination = (floorNumber > elevator.Destination ? floorNumber : elevator.Destination);
+                elevator.Destination = Math.Max(floorNumber,elevator.Destination);
             }
             else if(elevator.CurrentFloor > floorNumber)
             {
                 elevator.Status = Enums.ElevatorStatus.MovingDown;
-                elevator.Destination = (floorNumber > elevator.Destination ? floorNumber : elevator.Destination);
+                elevator.Destination = Math.Min(floorNumber,elevator.Destination);
+            }
+            else if (elevator.CurrentFloor == floorNumber)
+            {
+                int up = elevator.Passangers.Count(x => x.DestinationFloor > floorNumber);
+                int down = elevator.Passangers.Count(x => x.DestinationFloor < floorNumber);
+
+                if (up == down)
+                {
+                    elevator.Status = Enums.ElevatorStatus.MovingUp;
+                    PickUpPeople(floorNumber, elevator);
+                }
+                else if(up > down)
+                {
+                    elevator.Destination = Math.Max(floorNumber, elevator.Destination);
+                    elevator.Status = Enums.ElevatorStatus.MovingUp;
+                }
+                else
+                {
+                    elevator.Destination = Math.Min(floorNumber, elevator.Destination);
+                    elevator.Status = Enums.ElevatorStatus.MovingDown;
+                }
             }
         }
 
         private PeopleElevator GetClosestElevator(int floorNumber)
         {
             //Select all elevator moving in right direction or standing still not at capacity
-            List<PeopleElevator> selection = ThisBuilding.PeopleElevators.Where(x => ((x.Status ==  Enums.ElevatorStatus.MovingDown && x.CurrentFloor> floorNumber)
-                                                                            || x.Status == Enums.ElevatorStatus.Stationary) 
-                                                                            && x.Passangers.Count()<ThisBuilding.MaxPassengers).ToList();
-            selection.AddRange(ThisBuilding.PeopleElevators.Where(x => ((x.Status == Enums.ElevatorStatus.MovingUp && x.CurrentFloor < floorNumber)
-                                                                            || x.Status == Enums.ElevatorStatus.Stationary)
-                                                                            && x.Passangers.Count() < ThisBuilding.MaxPassengers).ToList());
-            selection = selection.Distinct().OrderBy(item => Math.Abs(item.CurrentFloor - floorNumber)).ToList();
-            return selection.OrderBy(item => Math.Abs(item.CurrentFloor - floorNumber)).First();
+            List<PeopleElevator> possibleElevators = ThisBuilding.PeopleElevators.Where(x => x.Status == Enums.ElevatorStatus.Stationary).ToList();
+
+            possibleElevators.AddRange(ThisBuilding.PeopleElevators.Where(x => ((x.Status == Enums.ElevatorStatus.MovingDown && x.CurrentFloor > floorNumber)                                                                           
+                                                                            && x.Passangers.Count() < ThisBuilding.MaxPassengers)).ToList());
+            possibleElevators.AddRange(ThisBuilding.PeopleElevators.Where(x => ((x.Status == Enums.ElevatorStatus.MovingUp && x.CurrentFloor < floorNumber)
+                                                                            && x.Passangers.Count() < ThisBuilding.MaxPassengers)).ToList());
+            possibleElevators = possibleElevators.Distinct().OrderBy(elevator => Math.Abs(elevator.CurrentFloor - floorNumber)).ToList();
+            return possibleElevators.First();
         }
 
         private void MoveElevators()
         {
-            Thread.Sleep(1000);
+            Thread.Sleep(2000);
             for (int i = 0; i < ThisBuilding.PeopleElevators.Count(); i++)
             {                
                 PeopleElevator elevator = ThisBuilding.PeopleElevators[i];
@@ -214,10 +236,6 @@ namespace ElevatorSim.Service
                         {
                             elevator.CurrentFloor--;
                         }
-                        break;
-                    case Enums.ElevatorStatus.Stationary:
-                        break;
-                    case Enums.ElevatorStatus.UnderMaimtenance:
                         break;
                     default:
                         break;
@@ -265,14 +283,12 @@ namespace ElevatorSim.Service
             if (ThisBuilding.PeopleElevators.Count(x => x.Status == Enums.ElevatorStatus.Stationary) == ThisBuilding.PeopleElevators.Count)
             {
                 PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
-                AssignElevator(ThisBuilding.PeopleElevators.First(), floor.FloorNumber);
+                AssignElevator(elevator, floor.FloorNumber);
+                return;
             }
-
-            List<PeopleElevator> goingUp= ThisBuilding.PeopleElevators.Where(x=> x.Status==Enums.ElevatorStatus.MovingUp).ToList();
-            List<PeopleElevator> goingDown = ThisBuilding.PeopleElevators.Where(x => x.Status == Enums.ElevatorStatus.MovingDown).ToList();
-            List<Passenger> passengersGoinUp = floor.PassengersWaiting.Where(x=> x.DestinationFloor>floor.FloorNumber).ToList();
+                        
+            List<PeopleElevator> goingDown = ThisBuilding.PeopleElevators.Where(x => x.Status == Enums.ElevatorStatus.MovingDown).ToList();            
             List<Passenger> passengersGoinDown = floor.PassengersWaiting.Where(x => x.DestinationFloor < floor.FloorNumber).ToList();
-
             foreach (Passenger passanger in passengersGoinDown)
             {
                 if (goingDown.Count>0)
@@ -282,9 +298,12 @@ namespace ElevatorSim.Service
                         PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
                         AssignElevator(elevator,floor.FloorNumber);
                     }
+                    return;
                 }
-
             }
+
+            List<PeopleElevator> goingUp = ThisBuilding.PeopleElevators.Where(x => x.Status == Enums.ElevatorStatus.MovingUp).ToList();
+            List<Passenger> passengersGoinUp = floor.PassengersWaiting.Where(x => x.DestinationFloor > floor.FloorNumber).ToList();
             foreach (Passenger passanger in passengersGoinUp)
             {
                 if (goingUp.Count>0)
@@ -294,8 +313,7 @@ namespace ElevatorSim.Service
                         PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
                         AssignElevator(elevator, floor.FloorNumber);
                     }
-                }
-
+                }                
             }
         }
     }

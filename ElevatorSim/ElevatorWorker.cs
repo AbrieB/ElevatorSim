@@ -17,7 +17,7 @@ namespace ElevatorSim
     {
         public Building ThisBuilding { get; private set; }        
         private Process server;
-        private Process output;
+        private Process outputWindow;
         
         #region AddBuilding
         public void AddBuilding(int PeopleElevators, int FreightElevaors, int Floors, int MaxpassangersPerElevator = 10)
@@ -142,7 +142,7 @@ namespace ElevatorSim
         {
             ThisBuilding = null;
             server.Kill();
-            output.Kill();
+            outputWindow.Kill();
         }
         #endregion
 
@@ -179,14 +179,14 @@ namespace ElevatorSim
 
         public void OpenOutputWindow()
         {
-            if (output == null)
+            if (outputWindow == null)
             {
                 ProcessStartInfo psi = new ProcessStartInfo("ElevatorSim.Output.exe")
                 {
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Normal
                 };
-                output = Process.Start(psi);
+                outputWindow = Process.Start(psi);
             }
         }
         #endregion
