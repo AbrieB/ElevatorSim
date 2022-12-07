@@ -65,6 +65,6 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>xcopy.exe /E /Y  "$(OutDir)ElevatorSim.Output.exe" "$(SolutionDir)ElevatorSim\bin\Debug"</PostBuildEvent>
+    <PostBuildEvent>xcopy /Y  "$(ProjectDir)bin\Debug\ElevatorSim.Output.exe" "$(SolutionDir)ElevatorSim\bin\Debug"</PostBuildEvent>
   </PropertyGroup>
 </Project>

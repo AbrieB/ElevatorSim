@@ -9,6 +9,7 @@ using ElevatorSim.Common;
 using System.Net;
 using System.Web;
 using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace ElevatorSim
 {
@@ -85,6 +86,7 @@ namespace ElevatorSim
         #region Call elevator
         public void CallElevator(int FloorNumber, List<Passenger> Passangers)
         {
+            UpdateBuilding();
             if (Passangers.Count()<1)
             {
                 throw new Exception("No passangers on floor");
@@ -120,7 +122,7 @@ namespace ElevatorSim
             {
                 return;
             }
-
+            UpdateBuilding();
             ThisBuilding.Floors.First(x => x.FloorNumber == FloorNumber).PassengersWaiting.Add( new Passenger(Destination));
             CallServer("http://localhost:8001/CallElevator,ThisBuilding", ThisBuilding);
         }
@@ -146,6 +148,7 @@ namespace ElevatorSim
 
         public List<Passenger> AddPassenger(List<int> DestinationFloor)
         {
+            UpdateBuilding();
             if (DestinationFloor.Any(x=> x<0 || x>ThisBuilding.Floors.Count()))
             {
                 throw new Exception("Invalid floor number in list");
@@ -188,6 +191,30 @@ namespace ElevatorSim
         }
         #endregion
 
+        private string UpdateBuilding()
+        {
+            HttpWebRequest webrequest = (HttpWebRequest)WebRequest.Create("http://localhost:8001/GetUpdatedBuilding/");
+            webrequest.Method = "GET";
+
+            HttpWebResponse webresponse = (HttpWebResponse)webrequest.GetResponse();
+            Encoding enc = System.Text.Encoding.GetEncoding("utf-8");
+            StreamReader responseStream = new StreamReader(webresponse.GetResponseStream(), enc);
+            string result = string.Empty;
+            result = responseStream.ReadToEnd();
+            ServerRespone json = JsonConvert.DeserializeObject<ServerRespone>(result);
+            if (json.Success)
+            {
+                ThisBuilding = JsonConvert.DeserializeObject<Building>(json.Data);
+            }
+            else
+            {
+                Console.Write(json.ErrorMessage);
+            }
+
+            webresponse.Close();
+            return result;
+        }
+
         private string CallServer(string url, Building building)
         {
             HttpWebRequest webrequest = (HttpWebRequest)WebRequest.Create(url);
@@ -199,7 +226,7 @@ namespace ElevatorSim
             {
                 WriteIndented = true
             };
-            var input = JsonSerializer.Serialize(building, options);
+            var input = System.Text.Json.JsonSerializer.Serialize(building, options);
 
             byte[] byte1 = encoding.GetBytes(input);
 
@@ -210,7 +237,7 @@ namespace ElevatorSim
             StreamReader responseStream = new StreamReader(webresponse.GetResponseStream(), enc);
             string result = string.Empty;
             result = responseStream.ReadToEnd();
-            var json = JsonSerializer.Deserialize<ServerRespone>(result);
+            var json = System.Text.Json.JsonSerializer.Deserialize<ServerRespone>(result);
             if (!json.Success)
             {
                 Console.Write(json.ErrorMessage);

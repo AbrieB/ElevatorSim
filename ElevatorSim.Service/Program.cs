@@ -74,7 +74,12 @@ namespace ElevatorSim.Service
                 Console.WriteLine(request.RawUrl);
                 string response = string.Empty;
                 ServerRespone rsp = new ServerRespone();
-
+                
+                if (request.RawUrl.ToLower().Contains("getupdatedbuilding"))
+                {
+                    rsp = worker.GetUpdatedBuilding();
+                    return rsp;
+                }
                 if (request.RawUrl.ToLower().Contains("getbuildingview"))
                 {
                     rsp = worker.GetBuildingView();

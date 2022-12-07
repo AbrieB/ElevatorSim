@@ -14,7 +14,7 @@ namespace ElevatorSim
             ElevatorWorker worker = new ElevatorWorker();
             try
             {
-                worker.AddBuilding(3, 3, 5);      //Test data                        
+                worker.AddBuilding(3, 3, 9);      //Test data                        
             }
             catch(Exception ex)
             {

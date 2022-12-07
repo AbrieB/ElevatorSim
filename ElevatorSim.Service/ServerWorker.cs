@@ -14,8 +14,10 @@ namespace ElevatorSim.Service
     {
         private Building ThisBuilding { get; set; }
         BackgroundWorker elevatorWorker = new BackgroundWorker();
-        
-
+        public ServerWorker()
+        {
+            elevatorWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.elevatorWorker_DoWork);
+        }
         public ServerRespone UpdateBuilding(Building building)
         {
             try
@@ -33,6 +35,12 @@ namespace ElevatorSim.Service
         internal ServerRespone GetBuildingView()
         {
             return new ServerRespone() { Success = true, Data = DrawBuilding() };
+        }
+
+        internal ServerRespone GetUpdatedBuilding()
+        {
+            string json = JsonConvert.SerializeObject(ThisBuilding);
+            return new ServerRespone() { Success = true, Data = json };
         }
 
         private string DrawBuilding()
@@ -98,7 +106,9 @@ namespace ElevatorSim.Service
                         DropOffPeople(elevator.CurrentFloor, elevator);
                         PickUpPeople(elevator.CurrentFloor, elevator);
                     }
+                    UpdateElevatorDestination(elevator);
                 }
+
                 MoveElevators();
             }
         }
@@ -112,7 +122,12 @@ namespace ElevatorSim.Service
                 if (goingUp.Count>0)
                 {
                     int capacity = ThisBuilding.MaxPassengers - elevator.Passangers.Count();
-                    elevator.Passangers.AddRange(goingUp.Take(capacity));
+                    List<Passenger> passengers = goingUp.Take(capacity).ToList();
+                    elevator.Passangers.AddRange(passengers);
+                    foreach (Passenger passenger in passengers)
+                    {
+                        floor.PassengersWaiting.Remove(passenger);
+                    }                    
                 }
             }
             if (elevator.Status == Enums.ElevatorStatus.MovingDown)
@@ -151,7 +166,7 @@ namespace ElevatorSim.Service
                 elevator.Status = Enums.ElevatorStatus.MovingUp;
                 elevator.Destination = (floorNumber > elevator.Destination ? floorNumber : elevator.Destination);
             }
-            else
+            else if(elevator.CurrentFloor > floorNumber)
             {
                 elevator.Status = Enums.ElevatorStatus.MovingDown;
                 elevator.Destination = (floorNumber > elevator.Destination ? floorNumber : elevator.Destination);
@@ -174,12 +189,13 @@ namespace ElevatorSim.Service
         {
             for (int i = 0; i < ThisBuilding.PeopleElevators.Count(); i++)
             {
+                Thread.Sleep(1000);
                 PeopleElevator elevator = ThisBuilding.PeopleElevators[i];
                 
                 switch (elevator.Status)
                 {
                     case Enums.ElevatorStatus.MovingUp:
-                        if (elevator.CurrentFloor == elevator.Destination)
+                        if (elevator.CurrentFloor == elevator.Destination || elevator.CurrentFloor== ThisBuilding.Floors.Count)
                         {
                             elevator.Status = Enums.ElevatorStatus.Stationary;
                         }
@@ -189,7 +205,7 @@ namespace ElevatorSim.Service
                         }
                         break;
                     case Enums.ElevatorStatus.MovingDown:
-                        if (elevator.CurrentFloor == elevator.Destination)
+                        if (elevator.CurrentFloor == elevator.Destination || elevator.CurrentFloor == 1)
                         {
                             elevator.Status = Enums.ElevatorStatus.Stationary;
                         }
@@ -208,27 +224,77 @@ namespace ElevatorSim.Service
             }
         }
 
+        private void UpdateElevatorDestination(PeopleElevator elevator)
+        {
+            if (elevator.Passangers.Count<1)
+            {
+                return;
+            }
+            switch (elevator.Status)
+            {
+                case Enums.ElevatorStatus.MovingUp:
+                    elevator.Destination = elevator.Passangers.Max(x => x.DestinationFloor);
+                    break;
+                case Enums.ElevatorStatus.MovingDown:
+                    elevator.Destination = elevator.Passangers.Min(x => x.DestinationFloor);
+                    break;
+                case Enums.ElevatorStatus.Stationary:
+                    int up = elevator.Passangers.Count(x => x.DestinationFloor > elevator.CurrentFloor);
+                    int down = elevator.Passangers.Count(x => x.DestinationFloor < elevator.CurrentFloor);
+
+                    if (up > down)
+                    {
+                        elevator.Destination = elevator.Passangers.Max(x => x.DestinationFloor);
+                        elevator.Status = Enums.ElevatorStatus.MovingUp;
+                    }
+                    else
+                    {
+                        elevator.Destination = elevator.Passangers.Min(x => x.DestinationFloor);
+                        elevator.Status = Enums.ElevatorStatus.MovingDown;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
         private void AssignElevator(Floor floor)
         {
+            //If all elevators are stationary
+            if (ThisBuilding.PeopleElevators.Count(x => x.Status == Enums.ElevatorStatus.Stationary) == ThisBuilding.PeopleElevators.Count)
+            {
+                GetClosestElevator(floor.FloorNumber);
+                AssignElevator(ThisBuilding.PeopleElevators.First(), floor.FloorNumber);
+            }
+
             List<PeopleElevator> goingUp= ThisBuilding.PeopleElevators.Where(x=> x.Status==Enums.ElevatorStatus.MovingUp).ToList();
             List<PeopleElevator> goingDown = ThisBuilding.PeopleElevators.Where(x => x.Status == Enums.ElevatorStatus.MovingDown).ToList();
             List<Passenger> passengersGoinUp = floor.PassengersWaiting.Where(x=> x.DestinationFloor>floor.FloorNumber).ToList();
             List<Passenger> passengersGoinDown = floor.PassengersWaiting.Where(x => x.DestinationFloor < floor.FloorNumber).ToList();
+
             foreach (Passenger passanger in passengersGoinDown)
             {
+                if (goingDown.Count>0)
+                {
                 if (passengersGoinDown.Min(x=> x.DestinationFloor)< goingDown.Min(x=> x.Destination) )
                 {
                     PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
                     AssignElevator(elevator,floor.FloorNumber);
                 }
+                }
+
             }
             foreach (Passenger passanger in passengersGoinUp)
             {
-                if (passengersGoinUp.Max(x => x.DestinationFloor) > goingUp.Max(x => x.Destination))
+                if (goingUp.Count>0)
                 {
-                    PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
-                    AssignElevator(elevator, floor.FloorNumber);
+                    if (passengersGoinUp.Max(x => x.DestinationFloor) > goingUp.Max(x => x.Destination))
+                    {
+                        PeopleElevator elevator = GetClosestElevator(floor.FloorNumber);
+                        AssignElevator(elevator, floor.FloorNumber);
+                    }
                 }
+
             }
         }
     }
